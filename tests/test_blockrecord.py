@@ -6,6 +6,7 @@ import pytest
 
 from blockrecord import Block
 
+
 @pytest.fixture
 def genesis_block():
     data = [{'genesis': 'block'}]
