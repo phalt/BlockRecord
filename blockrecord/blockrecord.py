@@ -1,65 +1,126 @@
 # -*- coding: utf-8 -*-
-import hashlib
+from abc import ABC, abstractmethod
+import json
 import os
-import uuid
+
+from .block import Block
 
 """Main module."""
 
-# Change the number of 0's to increase or decrease difficulty
-MINED_VALID_VALUE = os.environ.get('MINED_VALID_VALUE', '0000')
+STORAGE_KEY = os.environ.get('BLOCK_RECORD_UUID', 'BLOCK_RECORD_UUID')
+STORAGE_KEY_CURRENT_UUID = os.environ.get(
+    'BLOCK_RECORD_CURRENT_BLOCK_UUID',
+    'BLOCK_RECORD_CURRENT_BLOCK_UUID'
+)
 
 
-class BlockRecord:
+class AbstractBlockRecord(ABC):
     """
-    BlockRecord manages the creation of new Blocks and stores Blocks
-    in the data store.
-    """
-
-    def __init__(self, *, redis):
-        self.redis = redis
-
-
-class Block:
-    """
-    A Block contains a single change of data.
+    AbstractBlockRecord is an AbstractBaseClass for rolling your
+    own persistence layer beneath the BlockRecord.
     """
 
-    def __repr__(self):
-        return '<Block {}>'.format(self.uuid)
-
-    def __init__(self, *, data=None, previous_hash=None):
-        self.uuid = uuid.uuid4()
-        self.nonce = None
-        self.data = data
-        self.previous_hash = previous_hash
-
-    def hash(self, nonce=None):
+    def __init__(self, *, persistence):
         """
-        Blocks are hashed in this format:
-
-        =================================
-        ||UUID|nonce|data|previous_hash||
-        =================================
+        Args:
+            persistence: The datastore you are persisting block records in.
         """
-        nonce = nonce or self.nonce
+        self.persistence = persistence
+        self.current_block_uuid = self._get_current_block_uuid()
+        if self.current_block_uuid:
+            self.current_block = self._generate_current_block()
+            self.verify_block(block=self.current_block)
 
-        message = hashlib.sha256()
-        message.update(self.uuid.hex.encode('utf-8'))
-        message.update(str(nonce).encode('utf-8'))
-        message.update(str(self.data).encode('utf-8'))
-        message.update(str(self.previous_hash).encode('utf-8'))
+    @abstractmethod
+    def _get_current_block_uuid(self):
+        """
+        Retrieves the most recent block UUID by looking for a key called
+        BLOCK_RECORD_CURRENT_BLOCK_UUID.
+        """
 
-        return message.hexdigest()
+    @abstractmethod
+    def _generate_current_block(self):
+        """
+        Generate a <Block> instance by looking in the persistence for the
+        uuid that matches self.current_block_uuid.
+        """
 
-    def _hash_is_valid(self, *, hsh):
-        return hsh.startswith(MINED_VALID_VALUE)
+    @abstractmethod
+    def save_block_to_db(self, *, block):
+        """
+        Save a <Block> in the persistence.
+        """
 
-    def mine(self):
-        nonce = self.nonce or 0
-        while True:
-            hsh = self.hash(nonce=nonce)
-            if self._hash_is_valid(hsh=hsh):
-                self.nonce = nonce
-                return hsh
-            else:
-                nonce += 1
+    def create_new_block(self, *, data):
+        """
+        Creates a brand new <Block> instance with the data and returns it.
+        """
+        if self.current_block:
+            previous_hash = self.current_block.hash(self.current_block.nonce)
+        else:
+            previous_hash = None
+        return Block(
+            data=data, previous_hash=previous_hash
+        )
+
+    def verify_block(self, *, block):
+        """
+        Verifies a block by trying to compute Block's current hash
+        against a new version of the hash with the nonce.
+
+        If this returns False then it is likely that the Block's data
+        has changed.
+        """
+        old_hash = block.hash
+        if old_hash:
+            assert old_hash == block.hash(block.nonce)
+        else:
+            raise ValueError('No previous hash on Block. Cannot verify')
+
+
+class BlockRecordRedis(AbstractBlockRecord):
+    """
+    BlockRecordRedis stores Blocks in Redis.
+    """
+
+    def _get_current_block_uuid(self):
+        """
+        This BlockRecord uses Redis and we search for the
+        STORAGE_KEY_CURRENT_UUID to retrive it.
+        """
+        if self.persistence.exists(STORAGE_KEY_CURRENT_UUID):
+            return self.persistence.get(
+                STORAGE_KEY_CURRENT_UUID
+            ).decode('utf-8')
+        else:
+            return None
+
+    def _generate_current_block(self):
+        """
+        Gets the Block data out of Redis.
+        """
+        result = self.persistence.get(
+            '{}::{}'.format(STORAGE_KEY, self.current_block_uuid)
+        )
+        block_data = json.loads(result)
+        return Block(
+            uuid=block_data['uuid'],
+            data=block_data['data'],
+            previous_hash=block_data['previous_hash'],
+            nonce=block_data['nonce'],
+            hsh=block_data['hsh']
+        )
+
+    def save_block_to_db(self, block):
+        """
+        Stores a <Block> in Redis.
+        """
+        context = {
+            'uuid': block.uuid,
+            'data': block.data,
+            'previous_hash': block.data,
+            'nonce': block.nonce,
+            'hsh': block.hash(block.nonce)
+        }
+        storage_key = '{}::{}'.format(STORAGE_KEY, block.uuid)
+        self.persistence.set(storage_key, json.dumps(context))
