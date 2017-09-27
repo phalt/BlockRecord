@@ -20,12 +20,14 @@ class AbstractBlockRecord(ABC):
     own persistence layer beneath the BlockRecord.
     """
 
-    def __init__(self, *, persistence):
+    def __init__(self, *, persistence, chain=None):
         """
         Args:
             persistence: The datastore you are persisting block records in.
+            chain: A list of <Block> instances in the chain.
         """
         self.persistence = persistence
+        self.chain = chain or []
         self.current_block_uuid = self._get_current_block_uuid()
         if self.current_block_uuid:
             self.current_block = self._generate_current_block()
@@ -59,6 +61,12 @@ class AbstractBlockRecord(ABC):
         Get a <Block> instance from its uuid.
         """
 
+    @abstractmethod
+    def dump_blocks_to_db(self, *, uuid):
+        """
+        Dump all blocks in the current chain into the database.
+        """
+
     def create_new_block(self, *, data):
         """
         Creates a brand new <Block> instance with the data and returns it.
@@ -84,6 +92,28 @@ class AbstractBlockRecord(ABC):
             assert old_hash == block.hash(block.nonce)
         else:
             raise ValueError('No previous hash on Block. Cannot verify')
+
+    def verify_chain(self):
+        """
+        Verifies the entire chain of <Blocks> that we have, starting from the
+        first one and moving forward.
+        """
+        for index, block in enumerate(self.chain):
+            if index == 0:
+                # It is the first block, so just calculate the hash
+                prev_hash = block.hash(block.nonce)
+            else:
+                # It's along the chain, calculate the hash with the previous
+                prev_block = self.chain[index - 1]
+                if not prev_block.hash(prev_block.nonce) == prev_hash:
+                    raise ValueError(
+                        'Blockchain is broken at UUID %s', prev_block.uuid
+                    )
+                # Set previous hash as the current block
+                prev_hash = block.hash(
+                    nonce=block.nonce, previous_hash=prev_hash
+                )
+        return True
 
 
 class BlockRecordRedis(AbstractBlockRecord):
@@ -119,21 +149,25 @@ class BlockRecordRedis(AbstractBlockRecord):
             hsh=block_data['hsh']
         )
 
+    def dump_blocks_to_db(self):
+        """
+        Stores all the blocks in self.chain in the database.
+        """
+        for block in self.chain:
+            context = block.to_context()
+            storage_key = '{}::{}'.format(STORAGE_KEY, str(block.uuid))
+            self.persistence.set(storage_key, json.dumps(context))
+
     def save_block_to_db(self, *, block):
         """
         Stores a <Block> in Redis.
         """
-        context = {
-            'uuid': str(block.uuid),
-            'data': block.data,
-            'previous_hash': block.previous_hash,
-            'nonce': block.nonce,
-            'hsh': block.hash(block.nonce)
-        }
+        context = block.to_context()
         storage_key = '{}::{}'.format(STORAGE_KEY, str(block.uuid))
         self.persistence.set(storage_key, json.dumps(context))
         self.current_block_uuid = block.uuid
         self.current_block = block
+        self.chain.append(block)
 
     def get_block(self, *, uuid):
         """

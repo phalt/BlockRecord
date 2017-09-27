@@ -32,6 +32,16 @@ def test_basic_block():
     assert resulting_hash == genesis.hash(genesis.nonce)
 
 
+def test_block_to_context(genesis_block):
+    assert genesis_block.to_context() == {
+        'uuid': str(genesis_block.uuid),
+        'data': genesis_block.data,
+        'previous_hash': genesis_block.previous_hash,
+        'nonce': genesis_block.nonce,
+        'hsh': genesis_block.hash(genesis_block.nonce)
+    }
+
+
 def test_block_with_parent(genesis_block):
     # Any data
     data = ['foo', 'bar']

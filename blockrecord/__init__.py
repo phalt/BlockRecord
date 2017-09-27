@@ -7,4 +7,4 @@ __email__ = 'paulandrewhallett@gmail.com'
 __version__ = '0.1.0'
 
 from .block import Block  # noqa
-from .blockrecord import AbstractBlockRecord, BlockRecordRedis  # noqa
+from .record import AbstractBlockRecord, BlockRecordRedis  # noqa

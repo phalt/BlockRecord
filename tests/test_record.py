@@ -32,3 +32,17 @@ def test_generate_genesis_block_and_save_it_return_it(redis_instance):
     new_genesis = record.get_block(uuid=genesis.uuid)
     # They should result in identical hashes
     assert new_genesis.hash(new_genesis.nonce) == genesis.hash(genesis.nonce)
+
+
+def test_verify_chain_works_with_big_list_of_blocks(redis_instance):
+    genesis_block = Block(data={'value': 123})
+    genesis_block.mine()
+    chain = [genesis_block]
+    previous_hash = genesis_block.hsh
+    for x in range(3):
+        block = Block(data={'value': x}, previous_hash=previous_hash)
+        previous_hash = block.mine()
+        chain.append(block)
+
+    record = BlockRecordRedis(persistence=redis_instance, chain=chain)
+    assert record.verify_chain()
