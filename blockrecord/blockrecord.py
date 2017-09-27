@@ -30,6 +30,8 @@ class AbstractBlockRecord(ABC):
         if self.current_block_uuid:
             self.current_block = self._generate_current_block()
             self.verify_block(block=self.current_block)
+        else:
+            self.current_block = None
 
     @abstractmethod
     def _get_current_block_uuid(self):
@@ -49,6 +51,12 @@ class AbstractBlockRecord(ABC):
     def save_block_to_db(self, *, block):
         """
         Save a <Block> in the persistence.
+        """
+
+    @abstractmethod
+    def get_block(self, *, uuid):
+        """
+        Get a <Block> instance from its uuid.
         """
 
     def create_new_block(self, *, data):
@@ -111,16 +119,35 @@ class BlockRecordRedis(AbstractBlockRecord):
             hsh=block_data['hsh']
         )
 
-    def save_block_to_db(self, block):
+    def save_block_to_db(self, *, block):
         """
         Stores a <Block> in Redis.
         """
         context = {
-            'uuid': block.uuid,
+            'uuid': str(block.uuid),
             'data': block.data,
-            'previous_hash': block.data,
+            'previous_hash': block.previous_hash,
             'nonce': block.nonce,
             'hsh': block.hash(block.nonce)
         }
-        storage_key = '{}::{}'.format(STORAGE_KEY, block.uuid)
+        storage_key = '{}::{}'.format(STORAGE_KEY, str(block.uuid))
         self.persistence.set(storage_key, json.dumps(context))
+        self.current_block_uuid = block.uuid
+        self.current_block = block
+
+    def get_block(self, *, uuid):
+        """
+        Get a <Block> instance from its uuid.
+        """
+        storage_key = '{}::{}'.format(STORAGE_KEY, str(uuid))
+        result = self.persistence.get(
+            storage_key
+        )
+        block_data = json.loads(result)
+        return Block(
+            uuid=block_data['uuid'],
+            data=block_data['data'],
+            previous_hash=block_data['previous_hash'],
+            nonce=block_data['nonce'],
+            hsh=block_data['hsh']
+        )

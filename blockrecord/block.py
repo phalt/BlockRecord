@@ -22,6 +22,8 @@ class Block:
         nonce=None,
         hsh=None
     ):
+        if isinstance(uuid, str):
+            uuid = uuid_lib.UUID(uuid)
         self.uuid = uuid or uuid_lib.uuid4()
         self.nonce = nonce
         self.data = data
