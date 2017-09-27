@@ -17,7 +17,10 @@ BlockRecord
 
 
 Blockchain-inspired record store for cryptographically verifiable auditing.
-BlockRecord provides a record store alongside an application's normal database, such that any changes to an application's database is recorded in the BlockRecord as a separate entity for future auditing or lookups.
+
+This provides the backend implementation of BlockRecord. Use this if you just want the chained record store.
+
+You should use the BlockRecordNode_ project if you want to set up distributed nodes.
 
 
 * Free software: GNU General Public License v3
@@ -27,14 +30,9 @@ BlockRecord provides a record store alongside an application's normal database, 
 Features
 --------
 
-* Block-based record store.
-* Cryptographically secure audit history of changes.
-
-Future Features
----------------
-
-* Searchable records.
-* Django-ORM integration or something.
+* Block-based record chain.
+* Cryptographically verifiable audit history of changes.
+* Abstract backends for custom datastore.
 
 Credits
 -------
@@ -43,3 +41,4 @@ This package was created with Cookiecutter_ and the `audreyr/cookiecutter-pypack
 
 .. _Cookiecutter: https://github.com/audreyr/cookiecutter
 .. _`audreyr/cookiecutter-pypackage`: https://github.com/audreyr/cookiecutter-pypackage
+.. _`BlockRcordNode`: https://github.com/phalt/blockrecordnode

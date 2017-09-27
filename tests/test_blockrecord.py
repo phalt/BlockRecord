@@ -46,3 +46,23 @@ def test_block_with_parent(genesis_block):
     assert second_block.nonce > 0
     # Make sure we can always preproduce the hash
     assert resulting_hash == second_block.hash(second_block.nonce)
+
+
+def test_block_with_broken_parent_breaks_chain(genesis_block):
+    # Any data
+    data = ['foo', 'bar']
+    previous_hash = genesis_block.hash(genesis_block.nonce)
+    second_block = Block(data=data, previous_hash=previous_hash)
+    # Assert things
+    assert not second_block.nonce
+    assert second_block.previous_hash == previous_hash
+    assert second_block.data == data
+    resulting_hash = second_block.mine()
+    # Make sure we can always preproduce the hash
+    assert resulting_hash == second_block.hash(second_block.nonce)
+    # Change the original block
+    genesis_block.data = ['omg wat']
+    second_block.previous_hash = genesis_block.hash(genesis_block.nonce)
+    second_result = second_block.hash(second_block.nonce)
+    # The block chain should be broken as the previous hash has changed
+    assert not resulting_hash == second_result
