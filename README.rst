@@ -18,8 +18,10 @@ BlockRecord
 
 Blockchain-inspired record store for cryptographically verifiable auditing.
 
-This provides the backend implementation of BlockRecord. Use this if you just want the chained record store.
+This is not a cryptocurrency.
+This adapts the Blockchain technology to be used for keeping a distributed, tamper-proof record of changes to sensitive data.
 
+This provides the backend implementation, namely the mining and the storing. Use this if you just want the chained record store.
 You should use the BlockRecordNode_ project if you want to set up distributed nodes.
 
 
@@ -32,7 +34,14 @@ Features
 
 * Block-based record chain.
 * Cryptographically verifiable audit history of changes.
-* Abstract backends for custom datastore.
+* Redis support out of the box.
+* Abstract backend for custom datastore.
+
+
+How it is not a cryptocurrency
+------------------------------
+
+- There is are no "coin" reward for mining things.
 
 Credits
 -------
