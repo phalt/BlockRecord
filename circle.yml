@@ -1,4 +1,6 @@
 machine:
+  services:
+    - redis
   pre:
     - cd /opt/circleci/.pyenv; git pull
   python:
